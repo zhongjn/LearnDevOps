@@ -1,0 +1,40 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-server-v1
+  labels:
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      app: echo-server
+      version: v1
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: echo-server
+        version: v1
+    spec:
+      containers:
+      - name: echo-server
+        image: registry.cn-shanghai.aliyuncs.com/zjn-test-ns/echoserver:1.4
+      imagePullSecrets:
+      - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: echo-server-v1
+  labels:
+    version: v1
+spec:
+  type: ClusterIP
+  ports:
+  - name: echo-port
+    port: 80
+    targetPort: 8080
+  selector:
+    app: echo-server
+    version: v1

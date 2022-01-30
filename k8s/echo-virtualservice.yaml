@@ -1,0 +1,18 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: echo-service-ingress
+spec:
+  hosts: 
+  - '*'
+  gateways:
+  - echo-gateway
+  http:
+  - route:
+    - destination:
+        host: echo-server-v1
+      weight: 50
+    - destination:
+        host: echo-server-v2
+      weight: 50
