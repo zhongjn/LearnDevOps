@@ -12,7 +12,10 @@ spec:
   - route:
     - destination:
         host: echo-server-v1
-      weight: 50
+      weight: 0
+    - destination:
+        host: hello-site-v1
+      weight: 100
     - destination:
         host: echo-server-v2
-      weight: 50
+      weight: 0

@@ -2,23 +2,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: echo-server-v1
+  name: hello-site-v1
   labels:
     version: v1
 spec:
   selector:
     matchLabels:
-      app: echo-server
+      app: hello-site
       version: v1
   replicas: 2
   template:
     metadata:
       labels:
-        app: echo-server
+        app: hello-site
         version: v1
     spec:
       containers:
-      - name: echo-server
+      - name: hello-site
         image: registry.cn-shanghai.aliyuncs.com/zjn-test-ns/test-image:latest
       imagePullSecrets:
       - name: regcred
@@ -26,15 +26,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: echo-server-v1
+  name: hello-site-v1
   labels:
     version: v1
 spec:
   type: ClusterIP
   ports:
-  - name: echo-port
+  - name: hello-port
     port: 80
-    targetPort: 8080
+    targetPort: 80
   selector:
-    app: echo-server
+    app: hello-site
     version: v1
