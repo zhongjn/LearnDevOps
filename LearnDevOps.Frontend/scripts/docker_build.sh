@@ -1,2 +1,2 @@
 #!/bin/bash
-docker build . --tag test-image:$(date +%Y-%m-%d-%H-%M) --tag test-image:latest
+docker build . --tag frontend:$(date +%Y-%m-%d-%H-%M) --tag frontend:latest
