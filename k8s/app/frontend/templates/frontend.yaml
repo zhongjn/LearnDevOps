@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    version: {{ .Chart.AppVersion }}
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+      version: {{ .Chart.AppVersion }}
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: {{ .Chart.AppVersion }}
+    spec:
+      containers:
+      - name: frontend
+        image: registry.cn-shanghai.aliyuncs.com/zjn-test-ns/frontend:latest
+      imagePullSecrets:
+      - name: regcred
+---
+apiVersion: {{ .Chart.AppVersion }}
+kind: Service
+metadata:
+  name: frontend-{{ .Chart.AppVersion }}
+  labels:
+    version: {{ .Chart.AppVersion }}
+spec:
+  type: ClusterIP
+  ports:
+  - name: frontend-port
+    port: 80
+    targetPort: 80
+  selector:
+    app: frontend
+    version: {{ .Chart.AppVersion }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: frontend
+spec:
+  hosts: 
+  - '*'
+  gateways:
+  - gw
+  http:
+  - route:
+    - destination:
+        host: frontend-{{ .Chart.AppVersion }}
+      weight: 100
+

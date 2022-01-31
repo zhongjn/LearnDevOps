@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:6.0-alpine as build
 
 WORKDIR /src
 
-COPY hello_site.fsproj .
+COPY LearnDevOps.Frontend.fsproj .
 RUN dotnet restore
 
 COPY . .
@@ -20,5 +20,5 @@ ENV ASPNETCORE_ENVIRONMENT Production
 ENV ASPNETCORE_URLS http://+:80
 EXPOSE 80
 
-CMD ["dotnet", "hello_site.dll"]
+CMD ["dotnet", "LearnDevOps.Frontend.dll"]
 
