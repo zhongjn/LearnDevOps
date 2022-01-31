@@ -10,6 +10,12 @@ spec:
       app: frontend
       version: {{ .Chart.AppVersion }}
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  minReadySeconds: 5
   template:
     metadata:
       labels:
@@ -19,10 +25,14 @@ spec:
       containers:
       - name: frontend
         image: registry.cn-shanghai.aliyuncs.com/zjn-test-ns/frontend:{{ .Values.imageVersion }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
       imagePullSecrets:
       - name: regcred
 ---
-apiVersion: {{ .Chart.AppVersion }}
+apiVersion: v1
 kind: Service
 metadata:
   name: frontend-svc
@@ -36,5 +46,4 @@ spec:
     targetPort: 80
   selector:
     app: frontend
-    version: {{ .Chart.AppVersion }}
 
