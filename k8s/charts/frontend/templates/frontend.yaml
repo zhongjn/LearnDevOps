@@ -1,14 +1,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend-{{ .Chart.AppVersion }}
+  name: frontend-dep
   labels:
     version: {{ .Chart.AppVersion }}
 spec:
   selector:
     matchLabels:
       app: frontend
-      version: {{ .Chart.AppVersion }}
   replicas: 2
   strategy:
     type: RollingUpdate

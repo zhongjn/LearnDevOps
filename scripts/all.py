@@ -34,7 +34,7 @@ def run():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--local', help='deploy to local cluster? (minikube)', type=bool)
+    parser.add_argument('--local', help='deploy to local cluster (minikube)', action='store_true')
     args = parser.parse_args()
     local_cluster = args.local
     run()

@@ -2,6 +2,7 @@
 set -e
 tag=$1
 mode=$2
+echo "current mode: $mode"
 if [ "local" == "$mode" ]; then
     eval $(minikube docker-env)
 fi
