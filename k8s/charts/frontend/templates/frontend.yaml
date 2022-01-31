@@ -25,6 +25,7 @@ spec:
       containers:
       - name: frontend
         image: registry.cn-shanghai.aliyuncs.com/zjn-test-ns/frontend:{{ .Values.imageVersion }}
+        imagePullPolicy: IfNotPresent
         readinessProbe:
           httpGet:
             path: /
