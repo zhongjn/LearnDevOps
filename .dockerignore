@@ -4,6 +4,7 @@ obj/
 *.user
 *.suo
 .vs
+.vscode
 launchSettings.json
 appsettings.Development.json
 scripts/

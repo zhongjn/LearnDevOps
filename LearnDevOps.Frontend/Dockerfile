@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:6.0-alpine as build
 
 WORKDIR /src
 
-COPY LearnDevOps.Frontend.fsproj .
+COPY LearnDevOps.Frontend.csproj .
 RUN dotnet restore
 
 COPY . .
