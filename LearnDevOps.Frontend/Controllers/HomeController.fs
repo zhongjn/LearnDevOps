@@ -20,6 +20,9 @@ type HomeController (logger : ILogger<HomeController>) =
     member this.Privacy () =
         this.View()
 
+    member this.Query () =
+        ()
+    
     [<ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)>]
     member this.Error () =
         let reqId = 

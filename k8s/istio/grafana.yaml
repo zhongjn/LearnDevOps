@@ -205,7 +205,8 @@ spec:
           configMap:
             name: istio-services-grafana-dashboards
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: grafana-pvc
 
 ---
 

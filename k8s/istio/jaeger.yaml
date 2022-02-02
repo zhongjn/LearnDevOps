@@ -52,7 +52,8 @@ spec:
               cpu: 10m
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: jaeger-pvc
 ---
 apiVersion: v1
 kind: Service
