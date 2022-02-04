@@ -6,3 +6,5 @@ obj/
 .vs
 .vscode
 launchSettings.json
+
+.fake
