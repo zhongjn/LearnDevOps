@@ -14,50 +14,53 @@ open Fake.IO.FileSystemOperators
 open Fake.IO.Globbing.Operators
 open Fake.Core.TargetOperators
 
-let checkedExec cmd args =
-    Trace.log $"command begin: {cmd} {args}"
-    let outStream = new MemoryStream()
-    let errStream = new MemoryStream()
-    let res = CreateProcess.fromRawCommandLine cmd args
-            |> CreateProcess.withStandardOutput (UseStream (false, outStream))
-            |> CreateProcess.withStandardError (UseStream (false, errStream))
-            |> Proc.run
-    Trace.log $"command end ({res.ExitCode}): {cmd} {args}"
-    let outReader = new StreamReader(outStream)
-    Trace.log <| outReader.ReadToEnd()
-    let errReader= new StreamReader(errStream)
-    Trace.traceError <| errReader.ReadToEnd()
-    if res.ExitCode <> 0 then
-        failwith "exec failed"
+type WriteLineStream(cmd, onWriteLine) =
+    inherit Stream()
+    let buf = new MemoryStream()
+    override this.CanWrite = true
+    override this.Write(buffer) =
+        buf.
+
 
 
 type Shell with
-    static member CheckedExec(cmd, ?args, ?dir) =
-        let u = CreateProcess.fromRawCommand "./folder/mytool.exe" ["arg1"; "arg2"]
-                        |> CreateProcess.redirectOutput
-                        |> Proc.run // start with the above configuration
-        let ret =
-            Shell.Exec(cmd, ?args = args, ?dir = dir)
+    static member private CheckedExecInternal(cmd, f) =
+        Trace.log $"command begin: {cmd}"
+        let outStream = new MemoryStream()
+        let errStream = new MemoryStream()
+        let
 
-        if ret <> 0 then
-            failwith $"non-zero return code: {ret}, cmd: {cmd}, args: {args}"
+        let res =
+            f cmd
+            |> CreateProcess.withStandardOutput (CreatePipe(false, outStream))
+            |> CreateProcess.withStandardError (UseStream(false, errStream))
+            |> Proc.run
+
+        // TODO realtime output
+        outStream.Seek(0L, SeekOrigin.Begin) |> ignore
+        errStream.Seek(0L, SeekOrigin.Begin) |> ignore
+        Trace.log $"command end with code {res.ExitCode}: {cmd}"
+        let outReader = new StreamReader(outStream)
+        Trace.log "stdout:"
+        Trace.log <| outReader.ReadToEnd()
+        let errReader = new StreamReader(errStream)
+        Trace.traceError "stderr:"
+        Trace.traceError <| errReader.ReadToEnd()
+
+        if res.ExitCode <> 0 then
+            failwith "exec failed"
+
+    static member CheckedExec(cmd, args: seq<string>) =
+        Shell.CheckedExecInternal(cmd, (fun c -> CreateProcess.fromRawCommand c args))
+
+    static member CheckedExec(cmd, ?args) =
+        Shell.CheckedExecInternal(cmd, (fun c -> CreateProcess.fromRawCommandLine c (args |> Option.defaultValue "")))
 
 let kubectl (nameSuffix: string) (args: string) =
     Trace.log $"kubectl {args}"
-    Shell.CheckedExec("kubectl", $"--context={nameSuffix} {args}")
+    Shell.CheckedExec("kubectl", $"--context=kind-it-{nameSuffix} {args}")
 
 let setupK8sCluster nameSuffix =
-    Console.Out.Flush()
-    Console.Error.Flush()
-    Shell.CheckedExec("bash", "scripts/err.sh")
-    Console.Out.Flush()
-    Console.Error.Flush()
-    Shell.CheckedExec("bash", "scripts/err.sh")
-    Console.Out.Flush()
-    Console.Error.Flush()
-    Shell.CheckedExec("bash", "scripts/err.sh")
-    Console.Out.Flush()
-    Console.Error.Flush()
     Trace.log $"setting up k8s cluster it-{nameSuffix}"
 
     // create cluster
@@ -65,11 +68,21 @@ let setupK8sCluster nameSuffix =
     // setup local registry
     Shell.CheckedExec("bash", "scripts/local_registry.sh")
     // allow volume expansion
-    kubectl nameSuffix """patch sc standard -p '{"allowVolumeExpansion":"true"}')"""
+    Shell.CheckedExec(
+        "kubectl",
+        [ "--context=kind-it-putthenquery"
+          "patch"
+          "sc"
+          "standard"
+          "-p"
+          "{\"allowVolumeExpansion\":true}" ]
+    )
+
     // setup istio
     Shell.CheckedExec("istioctl", "install -y")
     kubectl nameSuffix "apply -f k8s/istio-app"
 
+    // install app
     Shell.CheckedExec(
         "helm",
         "upgrade --install frontend k8s/charts/frontend"
@@ -91,7 +104,7 @@ let runSingleIntegrationTest name body =
 // teardownK8sCluster name
 
 let testPutThenQuery () =
-    runSingleIntegrationTest "putThenQuery" (fun _ -> ())
+    runSingleIntegrationTest "putthenquery" (fun _ -> ())
 
 Target.initEnvironment ()
 
