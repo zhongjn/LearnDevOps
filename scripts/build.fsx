@@ -61,40 +61,22 @@ let kubectl (nameSuffix: string) (args: string) =
     Trace.log $"kubectl {args}"
     Shell.CheckedExec("kubectl", $"--context=kind-it-{nameSuffix} {args}")
 
-let setupK8sLoadBalancer idx nameSuffix =
-    Trace.log "setting up load balancer"
-    kubectl nameSuffix "apply -f k8s/local-lb/namespace.yaml"
-    kubectl nameSuffix "apply -f k8s/local-lb/secret.yaml"
-    kubectl nameSuffix "apply -f k8s/local-lb/metallb.yaml"
-    // System.Threading.Thread.Sleep(1000)
-    // kubectl nameSuffix "wait --all pods -n metallb-system --for condition=ready --timeout=1000"
+let setupK8sPortForward idx nameSuffix =
+    let mutable proc = null
+    CreateProcess.fromRawCommandLine
+        "kubectl"
+        ($"port-forward -n istio-system"
+         + $" service/istio-ingressgateway {8080 + idx}:80")
+    |> CreateProcess.redirectOutput
+    |> CreateProcess.addOnStartedEx (fun info -> proc <- info.Process)
+    |> Proc.start
+    |> ignore
+    proc
 
-    let cidr =
-        let res =
-            CreateProcess.fromRawCommand
-                "docker"
-                [ "network"
-                  "inspect"
-                  "-f"
-                  "{{(index .IPAM.Config 0).Subnet}}"
-                  "kind" ]
-            |> CreateProcess.redirectOutput
-            |> CreateProcess.ensureExitCode
-            |> Proc.run
-        String.trim res.Result.Output
-    if cidr <> "172.18.0.0/16" then
-        failwith $"docker network cidr {cidr} not supported"
-
-    let dir = "k8s/local-lb"
-    let originalFilePath = $"{dir}/metallb-configmap-replace.yaml"
-    let outFilePath =
-        $"{dir}/metallb-configmap-it-{nameSuffix}.yaml"
-    Shell.copyFile outFilePath originalFilePath
-    Shell.replaceInFiles [ ("ADDR_RANGE_REPLACE", $"172.18.255.200-172.18.255.250") ] [
-        outFilePath
-    ]
-    kubectl nameSuffix $"apply -f {outFilePath}"
-
+type ClusterContext =
+    { Name: string
+      Idx: int
+      PortForwardProcess: System.Diagnostics.Process }
 
 let setupK8sCluster idx nameSuffix =
     Trace.log $"setting up k8s cluster it-{nameSuffix}"
@@ -112,8 +94,6 @@ let setupK8sCluster idx nameSuffix =
           "-p"
           "{\"allowVolumeExpansion\":true}" ]
     )
-    // setup load balancer
-    setupK8sLoadBalancer idx nameSuffix
     // setup istio
     Shell.CheckedExec("istioctl", "install -y")
     kubectl nameSuffix "apply -f k8s/istio-app"
@@ -134,11 +114,14 @@ let setupK8sCluster idx nameSuffix =
         + " --set registry=localhost:5000"
     )
 
-let teardownK8sCluster nameSuffix =
-    let err =
-        Shell.Exec("kind", $"delete cluster --name it-{nameSuffix}")
+    let proc = setupK8sPortForward idx nameSuffix
+    { Name = nameSuffix
+      Idx = idx
+      PortForwardProcess = proc }
 
-    Trace.log $"teardown cluster err {err}"
+let teardownK8sCluster (ctx: ClusterContext) =
+    ctx.PortForwardProcess.Kill()
+    Shell.CheckedExec("kind", $"delete cluster --name it-{ctx.Name}")
 
 let mutable nextTestIndex = 0
 
@@ -146,9 +129,12 @@ let runSingleIntegrationTest name body =
     Trace.log $"Integration test: {name}"
     let idx = nextTestIndex
     nextTestIndex <- nextTestIndex + 1
-    teardownK8sCluster name
-    setupK8sCluster idx name
+    Shell.Exec("kind", $"delete cluster --name it-{name}")
+    |> ignore
+    let ctx = setupK8sCluster idx name
     body idx name
+    System.Threading.Thread.Sleep(10000 * 100)
+    teardownK8sCluster ctx
 // teardownK8sCluster name
 
 let testPutThenQuery () =
