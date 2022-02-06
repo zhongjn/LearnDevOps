@@ -57,31 +57,50 @@ type Shell with
     static member CheckedExec(cmd, ?args) =
         Shell.CheckedExecInternal(cmd, (fun c -> CreateProcess.fromRawCommandLine c (args |> Option.defaultValue "")))
 
-let kubectl (nameSuffix: string) (args: string) =
-    Trace.log $"kubectl {args}"
-    Shell.CheckedExec("kubectl", $"--context=kind-it-{nameSuffix} {args}")
+type ClusterConfig = { Name: string; Idx: int }
 
-let setupK8sPortForward idx nameSuffix =
+type ClusterContext =
+    { Config: ClusterConfig
+      PortForwardProcess: System.Diagnostics.Process }
+
+let kubectl config (args: string) =
+    Trace.log $"kubectl {args}"
+    Shell.CheckedExec("kubectl", $"--context=kind-it-{config.Name} {args}")
+
+let setupK8sPortForward config =
     let mutable proc = null
     CreateProcess.fromRawCommandLine
         "kubectl"
         ($"port-forward -n istio-system"
-         + $" service/istio-ingressgateway {8080 + idx}:80")
+         + $" service/istio-ingressgateway {8080 + config.Idx}:80")
     |> CreateProcess.redirectOutput
     |> CreateProcess.addOnStartedEx (fun info -> proc <- info.Process)
     |> Proc.start
     |> ignore
     proc
 
-type ClusterContext =
-    { Name: string
-      Idx: int
-      PortForwardProcess: System.Diagnostics.Process }
+let setupApp config =
+    kubectl config "apply -f k8s/istio-app"
+    // todo
+    kubectl
+        config
+        ("create secret generic frontend-es-cred"
+         + " --from-literal=ES_URI=http://quickstart-es-http:9200"
+         + " --from-literal=ES_PASSWORD=todo"
+         + " --from-literal=ES_USERNAME=todo")
+    // install app
+    Shell.CheckedExec(
+        "helm",
+        "upgrade --install frontend k8s/charts/frontend"
+        + " --set imageVersion=2022-02-02-19-53"
+        + " --set registry=localhost:5000"
+    )
 
-let setupK8sCluster idx nameSuffix =
-    Trace.log $"setting up k8s cluster it-{nameSuffix}"
+
+let setupK8sCluster config =
+    Trace.log $"setting up k8s cluster it-{config.Name}"
     // create cluster
-    Shell.CheckedExec("kind", $"create cluster --name it-{nameSuffix} --config scripts/kind-config.yaml")
+    Shell.CheckedExec("kind", $"create cluster --name it-{config.Name} --config scripts/kind-config.yaml")
     // setup local registry
     Shell.CheckedExec("bash", "scripts/local_registry.sh")
     // allow volume expansion
@@ -96,32 +115,15 @@ let setupK8sCluster idx nameSuffix =
     )
     // setup istio
     Shell.CheckedExec("istioctl", "install -y")
-    kubectl nameSuffix "apply -f k8s/istio-app"
-    kubectl nameSuffix "label namespace default istio-injection=enabled"
+    kubectl config "label namespace default istio-injection=enabled"
 
-    // todo
-    kubectl
-        nameSuffix
-        ("create secret generic frontend-es-cred"
-         + " --from-literal=ES_URI=http://quickstart-es-http:9200"
-         + " --from-literal=ES_PASSWORD=todo"
-         + " --from-literal=ES_USERNAME=todo")
-    // install app
-    Shell.CheckedExec(
-        "helm",
-        "upgrade --install frontend k8s/charts/frontend"
-        + " --set imageVersion=2022-02-02-19-53"
-        + " --set registry=localhost:5000"
-    )
-
-    let proc = setupK8sPortForward idx nameSuffix
-    { Name = nameSuffix
-      Idx = idx
+    let proc = setupK8sPortForward config
+    { Config = config
       PortForwardProcess = proc }
 
 let teardownK8sCluster (ctx: ClusterContext) =
     ctx.PortForwardProcess.Kill()
-    Shell.CheckedExec("kind", $"delete cluster --name it-{ctx.Name}")
+    Shell.CheckedExec("kind", $"delete cluster --name it-{ctx.Config.Name}")
 
 let mutable nextTestIndex = 0
 
